@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12]
+        os: [ubuntu-22.04]
 
     steps:
       - name: Check out repository
@@ -24,12 +24,6 @@ jobs:
       - name: Install MemorySanitizer dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y clang-14 libclang-14-dev llvm-14 llvm-14-dev llvm-14-tools llvm-14-linker-tools
-
-      - name: Install MemorySanitizer dependencies (macOS) 
-        if: runner.os == 'macOS' 
-        run: |
-          brew update
-          brew install llvm ninja coreutils
       
       - name: Run Google Memory Sanitizer (source code) (Linux)
         if: runner.os == 'Linux'
@@ -54,46 +48,6 @@ jobs:
                   fi
 
                   timeout $TIMEOUT_DURATION ./compiled.out
-                  exit_status=$?
-
-                  if [ $exit_status -eq 1 ]; then
-                      ((successful_compilations += 1))
-                      echo -e "\a"
-                  else
-                      ((failed_compilations += 1))
-                  fi
-
-                  rm -f ./compiled.out
-              fi
-          done
-          echo -e "\a"
-
-          echo "Memory Sanitizer Failures: $failed_compilations"
-          echo "Memory Sanitizer Successes: $successful_compilations"
-
-      - name: Run Google Memory Sanitizer (source code) (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          #!/bin/bash
-          set +e 
-
-          files=$(find . -type f)
-          failed_compilations=0
-          successful_compilations=0
-          TIMEOUT_DURATION=10
-
-          for file in $files; do
-              if [[ "$file" == *.c || "$file" == *.cpp ]]; then
-                  include_dirs=$(find . -name '*.h' -exec dirname {} + | sort -u | sed 's/^/-I /')
-                  if ! timeout 60 clang -I "$include_dirs" -fsanitize=memory -fPIE -pie -O2 -fno-omit-frame-pointer -fsanitize-memory-track-origins -g "$file" -o ./compiled.out > /dev/null 2> /tmp/clang_errors.txt; then
-                      exit_code=$?
-                      if [ $exit_code -eq 1 ]; then
-                          ((failed_compilations += 1))
-                      fi
-                      continue  # Skip to the next file on compilation error
-                  fi
-
-                  gtimeout $TIMEOUT_DURATION ./compiled.out
                   exit_status=$?
 
                   if [ $exit_status -eq 1 ]; then
