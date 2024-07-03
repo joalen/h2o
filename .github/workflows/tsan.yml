@@ -1,0 +1,64 @@
+name: Run ThreadSanitizer
+
+on:
+  push:
+
+jobs:
+  run-tsan:
+    name: '${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2 
+        with:
+          ref: aee409f9ae648bbd3899d92e12481d05883b5aa3
+          
+      - name: Build repository 
+        run: | 
+          export CC=clang
+          export CXX=clang++
+          export CFLAGS="-fsanitize=thread -fPIE -O2 -g -gcolumn-info"
+          export LDFLAGS="-fsanitize=thread -pie"
+          cmake .
+          sed -i 's/^CC\s*=.*/CC = clang/' Makefile
+          sed -i 's/^CXX\s*=.*/CXX = clang++/' Makefile
+          sed -i 's/^CFLAGS\s*=.*/& -fsanitize=thread -fPIE -O2 -g -gcolumn-info/' Makefile
+          sed -i 's/^LDFLAGS\s*=.*/& -fsanitize=thread -pie/' Makefile
+          sed -i 's/^CPP\s*=.*/CPP = clang -E/' Makefile
+          make
+
+      - name: Install ThreadSanitizer dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y clang-14 libclang-14-dev llvm-14 llvm-14-dev llvm-14-tools llvm-14-linker-tools
+      
+      - name: Run Google Thread Sanitizer (executables) (Linux)
+        if: runner.os == 'Linux'
+        run: |
+            #!/bin/bash
+            set +e
+            DIRECTORY=$(pwd)
+            
+            is_executable() {
+              local file="$1"
+              if file "$file" | grep -q 'ELF 64-bit'; then
+                return 0
+              else
+                return 1
+              fi
+            }
+            
+            run_with_tsan() {
+              local executable="$1"
+              TSAN_OPTIONS="force_seq_cst_atomics=1 exitcode=1 verbosity=2" timeout 10s "$executable"
+              local exit_status=$?
+            }
+                          
+            find "$DIRECTORY" -type f -executable | while read -r file; do
+              if is_executable "$file"; then
+                run_with_tsan "$file"
+              fi
+            done
