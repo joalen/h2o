@@ -77,8 +77,7 @@ jobs:
             if is_executable "$file"; then
               for tool_info in "${tools[@]}"; do
                 tool=(${tool_info})
-                output_file="valgrind_reports/${file}-${tool[1]}_klee_report.txt"
-                run_with_valgrind "$file" "${tool[0]}" "${tool[1]}" | tee -a "$output_file"
+                run_with_valgrind "$file" "${tool[0]}" "${tool[1]}" > "./valgrind_reports/${file}-${tool[1]}_klee_report.txt"
               done
             fi
           done
