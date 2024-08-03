@@ -24,13 +24,22 @@ jobs:
       - name: Install MemorySanitizer dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y clang-14 libclang-14-dev llvm-14 llvm-14-dev llvm-14-tools llvm-14-linker-tools
+
+      - name: Disable Address Space Randomization
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.randomize_va_space=0
       
+      - name: Disable swapping 
+        if: runner.os == 'Linux' 
+        run: sudo swapoff -a
+        
       - name: Run Google Memory Sanitizer (source code) (Linux)
         if: runner.os == 'Linux'
         run: |
           #!/bin/bash
           set +e 
 
+          mkdir -p memorysan_logs
           files=$(find . -type f)
           failed_compilations=0
           successful_compilations=0
@@ -47,7 +56,7 @@ jobs:
                       continue  # Skip to the next file on compilation error
                   fi
 
-                  timeout $TIMEOUT_DURATION ./compiled.out
+                  timeout $TIMEOUT_DURATION ./compiled.out > ./memorysan_logs/$(basename "$executable")_msan_report.txt 2>&1
                   exit_status=$?
 
                   if [ $exit_status -eq 1 ]; then
@@ -64,3 +73,9 @@ jobs:
 
           echo "Memory Sanitizer Failures: $failed_compilations"
           echo "Memory Sanitizer Successes: $successful_compilations"
+
+      - name: Upload Msan reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: msan-report-${{ github.event.repository.name}}-on-${{ matrix.os }}-from_branch_${{ github.ref_name }}
+          path: './memorysan_logs/*'
