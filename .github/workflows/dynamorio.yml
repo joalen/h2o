@@ -36,9 +36,6 @@ jobs:
         if: runner.os == 'Linux' 
         run: sudo swapoff -a
 
-      - name: Make parent folder
-        run: mkdir -p dynamoriologs
-                           
       - name: Run DynamoRIO (Memtrace)
         run: |
           #!/bin/bash
@@ -92,10 +89,15 @@ jobs:
           # Count number of executable files
           total_files=$(find . -type f -executable | wc -l)
           current_file=0
+          limit=10  # Limit to 5 executables
           
           # Find executable files and process them with a progress bar
           find . -type f -executable | while read -r file; do
             if is_executable "$file"; then
+              # Stop if we've reached the limit
+              if [ "$current_file" -ge "$limit" ]; then
+                break
+              fi
               # Show progress
               ((current_file++))
               show_progress "$current_file" "$total_files"
@@ -110,7 +112,7 @@ jobs:
           find "$LOG_DIR" -type f -size 0 -delete
           
           echo "=========[DynamoRIO Memtrace service finished]========="
-                    
+          
       - name: Upload DynamoRIO aggregated reports
         uses: actions/upload-artifact@v4
         with:
